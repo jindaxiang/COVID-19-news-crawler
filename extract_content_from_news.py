@@ -2,7 +2,7 @@
 # /usr/bin/env python
 """
 Author: Albert King
-date: 2020/3/6 19:27
+date: 2020/5/22 19:27
 contact: jindaxiang@163.com
 desc: 国家市场监督管理总局：首页 > 专题 > 市场监管战“疫”> 曝光台
 自动采集内容和摘要生成
@@ -13,6 +13,7 @@ import pyhanlp as nlp
 import requests
 from bs4 import BeautifulSoup
 from gne import GeneralNewsExtractor
+from urllib import parse
 
 extractor = GeneralNewsExtractor()
 headers = {
@@ -40,10 +41,10 @@ def get_url():
     r.encoding = "utf-8"
     soup = BeautifulSoup(r.text, "lxml")
     js_text = soup.find(attrs={"language": "JavaScript"}).text
-    page_num = js_text[js_text.find("//共多少页")-1:js_text.find("//共多少页")]
+    page_num = js_text[js_text.find("//共多少页")-2:js_text.find("//共多少页")]
     need_list = soup.find(attrs={"class": "textRightTxt"}).find_all(attrs={"target": "_blank"})
-    content_url_list = ["http://www.samr.gov.cn/zt/jjyq/bgt/" + item["href"][2:] for item in need_list]
-    title_list = [item.text for item in need_list]
+    content_url_list = [item["href"].strip("../../../") for item in need_list]
+    content_url_list = ["http://www.samr.gov.cn/zt/jjyq/bgt/" + item if item.startswith("2") else "http://www.samr.gov.cn/" + item for item in content_url_list]
     out_list.extend(content_url_list)
     for i in range(1, int(page_num)):
         print(f"正在采集第{i}页")
@@ -52,9 +53,11 @@ def get_url():
         r.encoding = "utf-8"
         soup = BeautifulSoup(r.text, "lxml")
         need_list = soup.find(attrs={"class": "textRightTxt"}).find_all(attrs={"target": "_blank"})
-        content_url_list = ["http://www.samr.gov.cn/zt/jjyq/bgt/" + item["href"][2:] for item in need_list]
-        title_list = [item.text for item in need_list]
-        out_list.extend(content_url_list)
+        content_url_list = [item["href"].strip("../../../") for item in need_list]
+        pre_content_url_list = ["http://www.samr.gov.cn/zt/jjyq/bgt/" + item if item.startswith("2") else "http://www.samr.gov.cn/" + item for item in content_url_list]
+        pre_content_url_list = [item.replace("http://www.samr.gov.cn/", "", 1) if "http://www.samr.gov.cn/http" in item else item for item in pre_content_url_list]
+        pre_content_url_list = [item.replace("http://www.samr.gov.cn/zjdt/", "http://www.samr.gov.cn/zt/jjyq/zjdt/") if item.startswith("http://www.samr.gov.cn/zjdt/") else item for item in pre_content_url_list]
+        out_list.extend(pre_content_url_list)
     return out_list
 
 
@@ -88,15 +91,7 @@ def extract_news(url: str) -> str:
 
 def generate_excel():
     all_url = get_url()
-    # 部分 url 修正
-    all_url[56] = 'http://www.samr.gov.cn/xw/zj/202002/t20200212_311474.html'
-    all_url[71] = 'http://www.samr.gov.cn/xw/zj/202001/t20200129_310831.html'
-    all_url[72] = 'http://www.samr.gov.cn/xw/zj/202001/t20200126_310744.html'
-    all_url[73] = 'http://www.samr.gov.cn/zt/jjyq/zjdt/202002/t20200201_310916.html'
-    all_url[74] = 'http://www.samr.gov.cn/zt/jjyq/zjdt/202002/t20200203_310966.html'
-    all_url[79] = 'http://www.samr.gov.cn/xw/zj/202002/t20200206_311171.html'
-    all_url[80] = 'http://www.samr.gov.cn/xw/zj/202002/t20200205_311039.html'
-
+    print(len(all_url))
     big_list = []
     for page, url_item in enumerate(all_url):
         print(f"正在采集第{page}篇文章内容，请稍等")
